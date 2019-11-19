@@ -1,0 +1,37 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class HealingItem : MonoBehaviour
+{
+    public int healthToGive;
+
+    private PlayerHealth pH;
+
+    private SFXManager sfxMan;
+
+    // Use this for initialization
+    void Start()
+    {
+        pH = FindObjectOfType<PlayerHealth>();
+        sfxMan = FindObjectOfType<SFXManager>();
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+
+
+    }
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if (other.gameObject.name == "Player")
+        {
+            sfxMan.playerHeals.Play();
+            pH.healthBar.value += healthToGive;
+            pH.currHealth = pH.healthBar.value;
+            gameObject.SetActive(false);
+        }
+    }
+}
