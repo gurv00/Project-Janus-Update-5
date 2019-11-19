@@ -1,0 +1,274 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class PlayerController : MonoBehaviour
+{
+
+    private Rigidbody2D rb;
+	private Animator anim;
+
+	// character controller input
+	private float HorizontalInput;
+	private float VerticalInput;
+
+	//move variables
+	public float jumpForce;
+	public float speed;
+
+	private float jumpTimeCounter;
+	public float jumpTime;
+	public float dashSpeed = 30;
+	
+
+	//shoot points
+	public Transform firePoint;
+	public Transform firePointLeft;
+	public GameObject Projectile;
+	public GameObject Projectile1;
+
+	//ladder variables
+	public float distance;
+	public float climbspeed;
+	public LayerMask ladderrecog;
+	public bool isClimbing;
+    public bool isCrouching;
+	public bool isDashing;
+	public bool ball;
+
+	private bool isJumping;
+	private bool hasDashed;
+
+	bool airborne;
+
+    public float keycard;
+    private SFXManager sfxMan;
+
+
+	void Start()
+    {
+		anim = GetComponent<Animator>();
+        sfxMan = FindObjectOfType<SFXManager>();
+        rb = GetComponent<Rigidbody2D>();
+        keycard = 0;
+	}
+
+   
+    void Update()
+    {
+
+		float xRaw = Input.GetAxisRaw("Horizontal");
+		float yRaw = Input.GetAxisRaw("Vertical");//update variables for dash
+
+		//Basic horizontal Movement
+
+		Movement();
+		
+		//Jump Logic
+		if (Input.GetKeyDown(KeyCode.UpArrow) || (Input.GetKeyDown(KeyCode.Space)))
+		{
+			if (airborne == false)
+			{
+				isJumping = true;
+				jumpTimeCounter = jumpTime;
+				rb.velocity = Vector2.up * jumpForce;
+				//anim.SetTrigger("isJumping");//move somewhere
+                anim.SetBool("isJumping", true);
+
+
+                sfxMan.playerJump.Play();
+            }
+        }
+		//Jump Logic Jump Higher
+		if (Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.Space))
+		{
+			if (jumpTimeCounter > 0)
+			{
+				rb.velocity = Vector2.up * jumpForce;
+				jumpTimeCounter -= Time.deltaTime;
+                anim.SetBool("isJumping", true);
+
+                sfxMan.playerJump.Play();
+            }
+			if(jumpTimeCounter <= 0)
+			{
+				isJumping = false;
+                anim.SetBool("isJumping", false);
+            }
+		}
+
+		//Lets go of Jump
+		if (Input.GetKeyUp(KeyCode.UpArrow) || (Input.GetKeyUp(KeyCode.Space)))
+		{
+			isJumping = false;
+		}
+
+			//airborne check
+			if (airborne == false)
+		{
+			anim.SetBool("isJumping", false);
+		}
+		/*else
+		{
+			anim.SetBool("isJumping", true);//maybe
+		}*/
+
+
+        //Crouching
+        if(Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.S))
+        {
+            isCrouching = true;
+            anim.SetBool("isCrouching", true);
+        } else
+        {
+            isCrouching = false;
+            anim.SetBool("isCrouching", false);
+        }
+
+        //Rolling (Ball form)
+        if(Input.GetKey(KeyCode.X))
+        {
+            ball = true;
+            anim.SetBool("Ball", true);
+        } else
+        {
+            ball = false;
+            anim.SetBool("Ball", false);
+        }
+
+		anim.SetFloat("Speed", Mathf.Abs(Input.GetAxisRaw("Horizontal")));
+
+	
+		if (Input.GetMouseButtonDown(2) && !ball)
+			{
+			//make more efficient next time, definitely no need for 2 instances...
+			if (GetComponent<SpriteRenderer>().flipX == false)
+			{
+				Fire();
+            }
+
+			else if (GetComponent<SpriteRenderer>().flipX == true)
+			{
+				Fire1();
+            }
+            anim.SetBool("isShooting", true);
+		}
+
+		else
+		{
+			anim.SetBool("isShooting", false);
+		}
+
+		//dash mechanic insert
+		if (Input.GetKeyDown(KeyCode.LeftShift) && !hasDashed)
+		{
+			if (xRaw != 0 || yRaw != 0)
+				Dash(xRaw, yRaw);
+
+            sfxMan.playerDash.Play();
+        }
+
+        //ladder mechanics
+        RaycastHit2D hitInfo = Physics2D.Raycast(transform.position, Vector2.up, distance, ladderrecog);
+
+		if (hitInfo.collider != null)
+		{
+			if (Input.GetKeyDown(KeyCode.UpArrow) || (Input.GetKeyDown(KeyCode.W)))
+			{
+				isClimbing = true;
+
+                //sfxMan.playerClimb.Play();
+            }
+        }
+		else
+		{
+			if (Input.GetKeyDown(KeyCode.LeftArrow) || (Input.GetKeyDown(KeyCode.RightArrow)))
+				isClimbing = false;
+		}
+
+		if (isClimbing == true && hitInfo.collider != null)
+		{
+            VerticalInput = Input.GetAxisRaw("Vertical");
+			rb.velocity = new Vector2(rb.velocity.x, VerticalInput * climbspeed);
+			rb.gravityScale = 0;
+		}
+		else
+		{
+			rb.gravityScale = 1;
+
+		}
+	}
+
+	void Movement()//horizontal movement
+	{
+        if (!isCrouching)
+        {
+            HorizontalInput = Input.GetAxis("Horizontal");
+            rb.velocity = new Vector2(HorizontalInput * speed, rb.velocity.y);
+        }
+		//sprite flip logic
+		if (Input.GetAxis("Horizontal") > 0)
+		{
+			GetComponent<SpriteRenderer>().flipX = false;
+		}
+
+		else if ((Input.GetAxis("Horizontal") < 0))
+		{
+			GetComponent<SpriteRenderer>().flipX = true;
+		}
+	}
+
+	//ground rules
+	private void OnCollisionStay2D(Collision2D collision)
+	{
+		if (collision.gameObject.CompareTag("Ground") || collision.gameObject.CompareTag("Movable"))
+		{
+			airborne = false;
+			hasDashed = false;
+		}
+	}
+
+	private void OnCollisionExit2D(Collision2D collision)
+	{
+		if (collision.gameObject.CompareTag("Ground") || collision.gameObject.CompareTag("Movable"))
+		{
+			airborne = true;
+		}
+	}
+
+	private void Dash(float x, float y)
+	{
+		hasDashed = true;
+
+		rb.velocity = Vector2.zero;
+		Vector2 dir = new Vector2(x, y);
+
+		rb.velocity += dir.normalized * dashSpeed;
+		StartCoroutine(DashWait());
+	}
+
+	IEnumerator DashWait()//delay function for dash
+	{
+		rb.gravityScale = 0;
+		isDashing = true;
+
+		yield return new WaitForSeconds(.3f);
+
+		rb.gravityScale = 3;
+		isDashing = false;
+	}
+	//shooting
+	void Fire()
+	{
+		Instantiate(Projectile, firePoint.position, firePoint.rotation);
+
+        sfxMan.playerShoot.Play();
+    }
+    //fire left
+    void Fire1()
+	{
+		Instantiate(Projectile1, firePointLeft.position, firePointLeft.rotation);
+
+        sfxMan.playerShoot.Play();
+    }
+}
